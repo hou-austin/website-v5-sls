@@ -1,0 +1,143 @@
+service: website-v5-sls
+
+plugins:
+  - serverless-plugin-typescript
+
+provider:
+  name: aws
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-west-1'}
+  iamRoleStatements:
+    - Effect: Allow
+      Action: s3:PutObject
+      Resource: arn:aws:s3:::${self:custom.userParams.CDN_BUCKET}/*
+    - Effect: Allow
+      Action: s3:GetObject
+      Resource: arn:aws:s3:::${self:custom.userParams.PRIVATE_BUCKET}/*
+  apiGateway:
+    binaryMediaTypes:
+      - "*/*"
+
+custom:
+  userParams:
+    PRIVATE_BUCKET: website-v5-images
+    CDN_BUCKET: website-v5-images-cdn
+
+functions:
+  website-v5-cdn-image-resizer:
+    runtime: nodejs16.x
+    handler: src/websiteV5CdnImageResizer.handler
+    memorySize: 1024
+    events:
+      - httpApi:
+          path: /image/{width}/{image+}
+          method: get
+    environment:
+      CDN_BUCKET_NAME: ${self:custom.userParams.CDN_BUCKET}
+      PRIVATE_BUCKET_NAME: ${self:custom.userParams.PRIVATE_BUCKET}
+
+resources:
+  Resources:
+    CDNBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.userParams.CDN_BUCKET}
+    CDNBucketPolicy:
+        Type: AWS::S3::BucketPolicy
+        Properties:
+          Bucket: !Ref CDNBucket
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource:
+                  Fn::Join:
+                    - /
+                    - - Fn::GetAtt:
+                        - CDNBucket
+                        - Arn
+                      - "*"
+                Principal:
+                  CanonicalUser:
+                    Fn::GetAtt:
+                      - CDNOriginAccessIdentity
+                      - S3CanonicalUserId
+    CDNOriginAccessIdentity:
+      Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+      Properties:
+        CloudFrontOriginAccessIdentityConfig:
+          Comment: Origin Access Identity to access private bucket
+    CDNCloudFront:
+      Type: AWS::CloudFront::Distribution
+      DependsOn:
+        - CDNBucket
+      Properties:
+        DistributionConfig:
+          Aliases:
+            - cdn.austinhou.com
+            - www.cdn.austinhou.com
+          Enabled: true
+          HttpVersion: http2
+          OriginGroups:
+            Items:
+              - Id: DynamicImageGroup
+                Members:
+                  Items:
+                    - OriginId: S3Origin
+                    - OriginId: APIGatewayOrigin
+                  Quantity: 2
+                FailoverCriteria:
+                  StatusCodes:
+                    Items:
+                      - 403
+                    Quantity: 1
+            Quantity: 1
+          Origins:
+            - Id: S3Origin
+              DomainName: ${self:custom.userParams.CDN_BUCKET}.s3.amazonaws.com
+              S3OriginConfig:
+                OriginAccessIdentity:
+                  Fn::Join:
+                    - /
+                    - - origin-access-identity
+                      - cloudfront
+                      - !Ref CDNOriginAccessIdentity
+            - Id: APIGatewayOrigin
+              DomainName:
+                Fn::Join:
+                  [
+                    ".",
+                    [
+                      !Ref HttpApi,
+                      execute-api,
+                      !Ref AWS::Region,
+                      amazonaws.com,
+                    ],
+                  ]
+              CustomOriginConfig:
+                HTTPSPort: 443
+                OriginProtocolPolicy: https-only
+          DefaultCacheBehavior:
+            AllowedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+            Compress: true
+            ForwardedValues:
+              QueryString: true
+              Cookies:
+                Forward: none
+              Headers:
+                - Access-Control-Request-Headers
+                - Access-Control-Request-Method
+                - Origin
+            TargetOriginId: DynamicImageGroup
+            ViewerProtocolPolicy: redirect-to-https
+          ViewerCertificate:
+            AcmCertificateArn: arn:aws:acm:us-east-1:287041520678:certificate/16d62fa9-c8e3-4378-a369-0f3659d79028
+            SslSupportMethod: sni-only
+            MinimumProtocolVersion: TLSv1.2_2021
+  Outputs:
+    CDNDomainName:
+      Value:
+        Fn::GetAtt: CDNCloudFront.DomainName

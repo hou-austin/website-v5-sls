@@ -1,0 +1,23 @@
+{
+  "name": "website-v5-sls",
+  "description": "",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "deploy": "rd /s /q node_modules/sharp && npm install --arch=x64 --platform=linux --target=12.13.1 sharp && npx serverless deploy -s prod"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.101",
+    "@types/node": "^18.0.5",
+    "aws-sdk": "^2.1176.0",
+    "serverless": "^3.21.0",
+    "serverless-plugin-typescript": "^2.1.2",
+    "typescript": "^4.7.4"
+  },
+  "author": "Austin Hou",
+  "license": "ISC",
+  "dependencies": {
+    "sharp": "^0.30.7"
+  }
+}
