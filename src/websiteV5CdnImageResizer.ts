@@ -7,7 +7,7 @@ const s3 = new AWS.S3();
 
 const supportedWidths = new Set([1920, 1280, 1200, 1024, 768, 720, 640, 560, 480, 320, 240]);
 
-exports.handler = async (event: APIGatewayEvent) => {
+exports.handler = async (event: APIGatewayEvent & {pathParameters: {width: string, image: string}}) => {
   console.log('request: ' + JSON.stringify(event, undefined, 2));
   if (event.headers['user-agent'] !== 'Amazon CloudFront') {
     console.log('Not from cloudfront!');
