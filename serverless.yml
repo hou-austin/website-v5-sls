@@ -28,9 +28,10 @@ functions:
     runtime: nodejs16.x
     handler: src/websiteV5CdnImageResizer.handler
     memorySize: 1024
+    timeout: 28
     events:
       - httpApi:
-          path: /image/{width}/{image+}
+          path: /image/{width}/{format}/{image+}
           method: get
     environment:
       CDN_BUCKET_NAME: ${self:custom.userParams.CDN_BUCKET}
@@ -73,9 +74,9 @@ resources:
         - CDNBucket
       Properties:
         DistributionConfig:
-          Aliases:
-            - cdn.austinhou.com
-            - www.cdn.austinhou.com
+#          Aliases:
+#            - cdn.austinhou.com
+#            - www.cdn.austinhou.com
           Enabled: true
           HttpVersion: http2
           OriginGroups:
