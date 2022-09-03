@@ -5,7 +5,7 @@ const AWS = require('aws-sdk');
 
 const s3 = new AWS.S3();
 
-const supportedWidths = new Set([1920, 1280, 1200, 1024, 768, 720, 640, 560, 480, 320, 240, 0]);
+const supportedWidths = new Set([1920, 1280, 1200, 1024, 768, 720, 640, 560, 480, 450, 320, 240, 0]);
 const supportedFormats = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'source']);
 const quality = 80;
 
@@ -58,7 +58,7 @@ exports.handler = async (event: Props) => {
   }).promise();
   console.log('Fetched image');
 
-  let transformedImage = await (isWidthZero ? sharp(file.Body) : sharp(file.Body).resize({width: parseInt(width)}));
+  let transformedImage = await (isWidthZero ? sharp(file.Body) : sharp(file.Body).resize({width: parseInt(width)}).rotate());
   console.log('Resized image');
 
   if (format !== 'source') {
@@ -84,7 +84,7 @@ exports.handler = async (event: Props) => {
         break;
       }
       case 'avif': {
-        transformedImage = transformedImage.avif({quality: Math.floor(quality * 0.7)});
+        transformedImage = transformedImage.avif({quality: Math.floor(quality * 0.7)}).rotate();
         break;
       }
       default: break;
